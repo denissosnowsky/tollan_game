@@ -100,8 +100,6 @@ contract TollanUniverseItems is
         notZeroAddress(signer)
     {
         __TollanUniverseItemsView_init();
-        __ERC1155Supply_init();
-        __ERC1155Pausable_init();
         __Nonces_init();
         __EIP712_init(name712, version712);
 
