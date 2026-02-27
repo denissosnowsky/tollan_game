@@ -9,6 +9,7 @@ contract TollanUniverseItemsStorage {
         mapping(string => uint256) physicalIdToTokenId;
         mapping(uint256 => string) tokenIdToPhysicalId;
         mapping(string => uint256) physicalIdToAmountCap;
+        mapping(address => mapping(string => uint256)) claimed;
     }
 
     // keccak256(abi.encode(uint256(keccak256("tollan.storage.TollanUniverseItems")) - 1)) & ~bytes32(uint256(0xff))

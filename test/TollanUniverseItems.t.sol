@@ -1030,6 +1030,125 @@ contract TollanUniverseItemsTest is Test {
 
         assertEq(tollanUniverseItems.balanceOf(user, tokenId), amount);
         assertEq(tollanUniverseItems.nonces(user), nonce + 1);
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_1), amount);
+    }
+
+    function test_Claim_AccumulatesCorrectly() public {
+        // Define item
+        vm.prank(admin);
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
+
+        uint256 tokenId = 1;
+
+        // First claim: 50 tokens
+        uint256 amount1 = 50;
+        uint256 deadline1 = block.timestamp + 1 hours;
+        uint256 nonce1 = tollanUniverseItems.nonces(user);
+        bytes memory signature1 = _signClaim(
+            user,
+            tokenId,
+            PHYSICAL_ID_1,
+            amount1,
+            nonce1,
+            deadline1
+        );
+
+        vm.prank(user);
+        tollanUniverseItems.claim(
+            tokenId,
+            PHYSICAL_ID_1,
+            amount1,
+            deadline1,
+            signature1
+        );
+
+        // Verify first claim
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_1), 50);
+        assertEq(tollanUniverseItems.balanceOf(user, tokenId), 50);
+
+        // Second claim: 30 more tokens
+        uint256 amount2 = 30;
+        uint256 deadline2 = block.timestamp + 2 hours;
+        uint256 nonce2 = tollanUniverseItems.nonces(user);
+        bytes memory signature2 = _signClaim(
+            user,
+            tokenId,
+            PHYSICAL_ID_1,
+            amount2,
+            nonce2,
+            deadline2
+        );
+
+        vm.prank(user);
+        tollanUniverseItems.claim(
+            tokenId,
+            PHYSICAL_ID_1,
+            amount2,
+            deadline2,
+            signature2
+        );
+
+        // Verify accumulation
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_1), 80); // 50 + 30
+        assertEq(tollanUniverseItems.balanceOf(user, tokenId), 80);
+    }
+
+    function test_Claim_SeparatesClaimedByPhysicalId() public {
+        // Define two items
+        vm.startPrank(admin);
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_2,
+            METADATA_URI_2,
+            AMOUNT_CAP_UNLIMITED
+        );
+        vm.stopPrank();
+
+        // Claim 100 of item 1
+        uint256 amount1 = 100;
+        uint256 deadline1 = block.timestamp + 1 hours;
+        uint256 nonce1 = tollanUniverseItems.nonces(user);
+        bytes memory signature1 = _signClaim(
+            user,
+            1,
+            PHYSICAL_ID_1,
+            amount1,
+            nonce1,
+            deadline1
+        );
+
+        vm.prank(user);
+        tollanUniverseItems.claim(1, PHYSICAL_ID_1, amount1, deadline1, signature1);
+
+        // Claim 50 of item 2
+        uint256 amount2 = 50;
+        uint256 deadline2 = block.timestamp + 2 hours;
+        uint256 nonce2 = tollanUniverseItems.nonces(user);
+        bytes memory signature2 = _signClaim(
+            user,
+            2,
+            PHYSICAL_ID_2,
+            amount2,
+            nonce2,
+            deadline2
+        );
+
+        vm.prank(user);
+        tollanUniverseItems.claim(2, PHYSICAL_ID_2, amount2, deadline2, signature2);
+
+        // Verify separate tracking
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_1), 100);
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_2), 50);
+        assertEq(tollanUniverseItems.balanceOf(user, 1), 100);
+        assertEq(tollanUniverseItems.balanceOf(user, 2), 50);
     }
 
     function test_Claim_RevertsIfZeroAmount() public {
@@ -1259,6 +1378,81 @@ contract TollanUniverseItemsTest is Test {
         assertEq(tollanUniverseItems.balanceOf(user, 1), 10);
         assertEq(tollanUniverseItems.balanceOf(user, 2), 20);
         assertEq(tollanUniverseItems.nonces(user), nonce + 1);
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_1), 10);
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_2), 20);
+    }
+
+    function test_ClaimBatch_AccumulatesWithSingleClaim() public {
+        // Define items
+        vm.startPrank(admin);
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_2,
+            METADATA_URI_2,
+            AMOUNT_CAP_UNLIMITED
+        );
+        vm.stopPrank();
+
+        // Batch claim
+        uint256[] memory tokenIds = new uint256[](2);
+        tokenIds[0] = 1;
+        tokenIds[1] = 2;
+
+        string[] memory physicalIds = new string[](2);
+        physicalIds[0] = PHYSICAL_ID_1;
+        physicalIds[1] = PHYSICAL_ID_2;
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 10;
+        amounts[1] = 20;
+
+        uint256 deadline1 = block.timestamp + 1 hours;
+        uint256 nonce1 = tollanUniverseItems.nonces(user);
+        bytes memory signature1 = _signClaimBatch(
+            user,
+            tokenIds,
+            physicalIds,
+            amounts,
+            nonce1,
+            deadline1
+        );
+
+        vm.prank(user);
+        tollanUniverseItems.claimBatch(
+            tokenIds,
+            physicalIds,
+            amounts,
+            deadline1,
+            signature1
+        );
+
+        // Verify batch claim tracking
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_1), 10);
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_2), 20);
+
+        // Single claim 5 more of PHYSICAL_ID_1
+        uint256 amount2 = 5;
+        uint256 deadline2 = block.timestamp + 2 hours;
+        uint256 nonce2 = tollanUniverseItems.nonces(user);
+        bytes memory signature2 = _signClaim(
+            user,
+            1,
+            PHYSICAL_ID_1,
+            amount2,
+            nonce2,
+            deadline2
+        );
+
+        vm.prank(user);
+        tollanUniverseItems.claim(1, PHYSICAL_ID_1, amount2, deadline2, signature2);
+
+        // Verify accumulation
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_1), 15); // 10 + 5
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_2), 20); // unchanged
     }
 
     function test_ClaimBatch_RevertsIfLengthMismatch() public {

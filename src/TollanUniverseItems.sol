@@ -367,6 +367,7 @@ contract TollanUniverseItems is
 
         _useNonce(_msgSender());
         _mintBatch(_msgSender(), tokenIds, amounts, "");
+        _claimIncreaseBatch(_msgSender(), physicalIds, amounts);
         emit ItemsClaimed(_msgSender(), tokenIds, amounts);
     }
 
@@ -402,6 +403,7 @@ contract TollanUniverseItems is
         _validateSignature(structHash, signature);
         _useNonce(_msgSender());
         _mint(_msgSender(), tokenId, amount, "");
+        _claimIncrease(_msgSender(), physicalId, amount);
         emit ItemClaimed(_msgSender(), tokenId, amount);
     }
 
@@ -471,5 +473,27 @@ contract TollanUniverseItems is
         bytes32 digest = _hashTypedDataV4(structHash);
         address signer = digest.recover(signature);
         if (_getTollanItemsStorage().signer != signer) revert InvalidSigner();
+    }
+
+    function _claimIncrease(
+        address user,
+        string calldata physicalId,
+        uint256 amount
+    ) internal {
+        TollanItemsStorage storage $ = _getTollanItemsStorage();
+        $.claimed[user][physicalId] = $.claimed[user][physicalId] + amount;
+    }
+
+    function _claimIncreaseBatch(
+        address user,
+        string[] calldata physicalIds,
+        uint256[] calldata amounts
+    ) internal {
+        TollanItemsStorage storage $ = _getTollanItemsStorage();
+        for (uint256 i = 0; i < physicalIds.length; i++) {
+            $.claimed[user][physicalIds[i]] =
+                $.claimed[user][physicalIds[i]] +
+                amounts[i];
+        }
     }
 }

@@ -95,6 +95,17 @@ contract TollanUniverseItemsView is
         return $.physicalIdToAmountCap[physicalId];
     }
 
+    /**
+     * @inheritdoc ITollanUniverseItemsView
+     */
+    function getClaimed(
+        address user,
+        string calldata physicalId
+    ) external view returns (uint256) {
+        TollanItemsStorage storage $ = _getTollanItemsStorage();
+        return $.claimed[user][physicalId];
+    }
+
     function uri(
         uint256 tokenId
     )

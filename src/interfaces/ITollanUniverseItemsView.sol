@@ -56,4 +56,15 @@ interface ITollanUniverseItemsView is IErrors {
     function getAmountCap(
         string calldata physicalId
     ) external view returns (uint256);
+
+    /**
+     * @notice Returns number of claimed tokens
+     * @param user wallet address
+     * @param physicalId partial ID.
+     * @return amount claimed tokens by id
+     */
+    function getClaimed(
+        address user,
+        string calldata physicalId
+    ) external view returns (uint256);
 }
