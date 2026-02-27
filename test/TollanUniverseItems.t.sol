@@ -47,7 +47,7 @@ contract TollanUniverseItemsTest is Test {
 
     // EIP-712 typehashes
     bytes32 constant CLAIM_TYPEHASH =
-        0xb395120c6a2e3f275050bc1e5ad73742df9a5de843cb9b26b18620d1cc14c78e;
+        0xea97b92824caa45e673dad22b48157385b7963088a25cd77eda4e99f0b4450a2;
     bytes32 constant CLAIM_BATCH_TYPEHASH =
         0x70dae5e3916ec9bad3f26be7851dac19106818068928cf478718012a94764f52;
 
@@ -549,19 +549,19 @@ contract TollanUniverseItemsTest is Test {
 
     function test_SetSigner_Success() public {
         address newSigner = makeAddr("newSigner");
-        
+
         vm.expectEmit(true, true, false, false);
         emit SignerUpdated(signer, newSigner);
-        
+
         vm.prank(admin);
         tollanUniverseItems.setSigner(newSigner);
-        
+
         assertEq(tollanUniverseItems.getSigner(), newSigner);
     }
 
     function test_SetSigner_RevertsIfNotAdmin() public {
         address newSigner = makeAddr("newSigner");
-        
+
         vm.prank(user);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -583,10 +583,10 @@ contract TollanUniverseItemsTest is Test {
 
     function test_SetSigner_EmitsEvent() public {
         address newSigner = makeAddr("newSigner");
-        
+
         vm.expectEmit(true, true, false, false);
         emit SignerUpdated(signer, newSigner);
-        
+
         vm.prank(admin);
         tollanUniverseItems.setSigner(newSigner);
     }
@@ -618,7 +618,7 @@ contract TollanUniverseItemsTest is Test {
         // Change signer
         uint256 newSignerPrivateKey = 0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890;
         address newSigner = vm.addr(newSignerPrivateKey);
-        
+
         vm.prank(admin);
         tollanUniverseItems.setSigner(newSigner);
 
@@ -651,7 +651,7 @@ contract TollanUniverseItemsTest is Test {
         // Change signer
         uint256 newSignerPrivateKey = 0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890;
         address newSigner = vm.addr(newSignerPrivateKey);
-        
+
         vm.prank(admin);
         tollanUniverseItems.setSigner(newSigner);
 
@@ -1268,7 +1268,13 @@ contract TollanUniverseItemsTest is Test {
         );
 
         vm.prank(user);
-        tollanUniverseItems.claim(1, PHYSICAL_ID_1, amount1, deadline1, signature1);
+        tollanUniverseItems.claim(
+            1,
+            PHYSICAL_ID_1,
+            amount1,
+            deadline1,
+            signature1
+        );
 
         // Claim 50 of item 2
         uint256 amount2 = 50;
@@ -1284,7 +1290,13 @@ contract TollanUniverseItemsTest is Test {
         );
 
         vm.prank(user);
-        tollanUniverseItems.claim(2, PHYSICAL_ID_2, amount2, deadline2, signature2);
+        tollanUniverseItems.claim(
+            2,
+            PHYSICAL_ID_2,
+            amount2,
+            deadline2,
+            signature2
+        );
 
         // Verify separate tracking
         assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_1), 100);
@@ -1590,7 +1602,13 @@ contract TollanUniverseItemsTest is Test {
         );
 
         vm.prank(user);
-        tollanUniverseItems.claim(1, PHYSICAL_ID_1, amount2, deadline2, signature2);
+        tollanUniverseItems.claim(
+            1,
+            PHYSICAL_ID_1,
+            amount2,
+            deadline2,
+            signature2
+        );
 
         // Verify accumulation
         assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_1), 15); // 10 + 5
@@ -2105,7 +2123,7 @@ contract TollanUniverseItemsTest is Test {
                 CLAIM_TYPEHASH,
                 to,
                 tokenId,
-                physicalId,
+                keccak256(bytes(physicalId)),
                 amount,
                 nonce,
                 deadline

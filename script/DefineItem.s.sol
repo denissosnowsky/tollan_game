@@ -10,7 +10,7 @@ contract DefineItemScript is Script {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         address contractAddress = vm.envOr(
             "CONTRACT_ADDRESS",
-            0xED572e235A870A8721E7Dd06Da3Ee427Adc476BB
+            0x229Cba7Bc864d202F9249AC8bcB666C27B3db605
         );
 
         // item data

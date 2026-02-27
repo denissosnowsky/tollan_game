@@ -406,7 +406,7 @@ contract TollanUniverseItems is
                 CLAIM_TYPEHASH,
                 _msgSender(),
                 tokenId,
-                physicalId,
+                keccak256(bytes(physicalId)),
                 amount,
                 nonce,
                 deadline

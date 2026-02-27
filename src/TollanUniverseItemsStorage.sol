@@ -16,9 +16,9 @@ contract TollanUniverseItemsStorage {
     bytes32 internal constant TOLLAN_ITEMS_STORAGE_LOCATION =
         0x688f56fc52f912ae5c31135e1893fd5e877bf2f5be8c927461940f3a15af0800;
 
-    /// keccak256("Claim(address to,uint256 tokenId,string physicalId,uint256 amount,uint256 nonce, uint256 deadline)")
+    /// keccak256("Claim(address to,uint256 tokenId,string physicalId,uint256 amount,uint256 nonce,uint256 deadline)")
     bytes32 internal constant CLAIM_TYPEHASH =
-        0xb395120c6a2e3f275050bc1e5ad73742df9a5de843cb9b26b18620d1cc14c78e;
+        0xea97b92824caa45e673dad22b48157385b7963088a25cd77eda4e99f0b4450a2;
     /// keccak256("ClaimBatch(address to,bytes32 tokenIdsHash,bytes32 physicalIdsHash,bytes32 amountsHash,uint256 nonce,uint256 deadline)")
     bytes32 internal constant CLAIM_BATCH_TYPEHASH =
         0x70dae5e3916ec9bad3f26be7851dac19106818068928cf478718012a94764f52;
