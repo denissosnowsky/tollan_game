@@ -87,6 +87,13 @@ interface ITollanUniverseItems is IErrors {
         uint256 amount
     );
 
+    /**
+     * @notice Emitted when the signer address is updated.
+     * @param oldSigner Previous signer address.
+     * @param newSigner New signer address.
+     */
+    event SignerUpdated(address indexed oldSigner, address indexed newSigner);
+
     // =============================================================
     // ITEM DEFINITION
     // =============================================================
@@ -236,6 +243,16 @@ interface ITollanUniverseItems is IErrors {
      * @param newBaseURI New base URI.
      */
     function setBaseURI(string calldata newBaseURI) external;
+
+    // =============================================================
+    // SIGNER MANAGEMENT
+    // =============================================================
+
+    /**
+     * @notice Updates the signer address used for claim signature validation.
+     * @param newSigner New signer address.
+     */
+    function setSigner(address newSigner) external;
 
     // =============================================================
     // PAUSE MANAGEMENT

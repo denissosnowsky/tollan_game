@@ -67,4 +67,10 @@ interface ITollanUniverseItemsView is IErrors {
         address user,
         string calldata physicalId
     ) external view returns (uint256);
+
+    /**
+     * @notice Returns the current signer address used for claim signature validation.
+     * @return signer Current signer address.
+     */
+    function getSigner() external view returns (address);
 }

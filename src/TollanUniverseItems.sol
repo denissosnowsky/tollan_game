@@ -218,6 +218,18 @@ contract TollanUniverseItems is
         _setDefaultRoyalty(receiver, feeNumerator);
     }
 
+    /**
+     * @inheritdoc ITollanUniverseItems
+     */
+    function setSigner(
+        address newSigner
+    ) external onlyRole(ADMIN_ROLE) notZeroAddress(newSigner) {
+        TollanItemsStorage storage $ = _getTollanItemsStorage();
+        address oldSigner = $.signer;
+        $.signer = newSigner;
+        emit SignerUpdated(oldSigner, newSigner);
+    }
+
     // =============================================================
     // MINTER FUNCTIONS
     // =============================================================

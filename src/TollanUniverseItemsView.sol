@@ -106,6 +106,14 @@ contract TollanUniverseItemsView is
         return $.claimed[user][physicalId];
     }
 
+    /**
+     * @inheritdoc ITollanUniverseItemsView
+     */
+    function getSigner() external view returns (address) {
+        TollanItemsStorage storage $ = _getTollanItemsStorage();
+        return $.signer;
+    }
+
     function uri(
         uint256 tokenId
     )

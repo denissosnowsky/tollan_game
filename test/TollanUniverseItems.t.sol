@@ -64,6 +64,7 @@ contract TollanUniverseItemsTest is Test {
         uint256[] amounts
     );
     event ItemClaimed(address indexed user, uint256 tokenId, uint256 amount);
+    event SignerUpdated(address indexed oldSigner, address indexed newSigner);
 
     function setUp() public {
         signer = vm.addr(signerPrivateKey);
@@ -536,6 +537,147 @@ contract TollanUniverseItemsTest is Test {
             )
         );
         tollanUniverseItems.setDefaultRoyalty(admin, 250);
+    }
+
+    // =============================================================
+    // SIGNER MANAGEMENT TESTS
+    // =============================================================
+
+    function test_GetSigner_ReturnsInitialSigner() public view {
+        assertEq(tollanUniverseItems.getSigner(), signer);
+    }
+
+    function test_SetSigner_Success() public {
+        address newSigner = makeAddr("newSigner");
+        
+        vm.expectEmit(true, true, false, false);
+        emit SignerUpdated(signer, newSigner);
+        
+        vm.prank(admin);
+        tollanUniverseItems.setSigner(newSigner);
+        
+        assertEq(tollanUniverseItems.getSigner(), newSigner);
+    }
+
+    function test_SetSigner_RevertsIfNotAdmin() public {
+        address newSigner = makeAddr("newSigner");
+        
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                user,
+                ADMIN_ROLE
+            )
+        );
+        tollanUniverseItems.setSigner(newSigner);
+    }
+
+    function test_SetSigner_RevertsIfZeroAddress() public {
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(IErrors.ZeroAddress.selector, address(0))
+        );
+        tollanUniverseItems.setSigner(address(0));
+    }
+
+    function test_SetSigner_EmitsEvent() public {
+        address newSigner = makeAddr("newSigner");
+        
+        vm.expectEmit(true, true, false, false);
+        emit SignerUpdated(signer, newSigner);
+        
+        vm.prank(admin);
+        tollanUniverseItems.setSigner(newSigner);
+    }
+
+    function test_Claim_RevertsAfterSignerChange_WithOldSignature() public {
+        // Define item
+        vm.prank(admin);
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
+
+        uint256 tokenId = 1;
+        uint256 amount = 10;
+        uint256 deadline = block.timestamp + 1 hours;
+        uint256 nonce = tollanUniverseItems.nonces(user);
+
+        // Sign with original signer
+        bytes memory signature = _signClaim(
+            user,
+            tokenId,
+            PHYSICAL_ID_1,
+            amount,
+            nonce,
+            deadline
+        );
+
+        // Change signer
+        uint256 newSignerPrivateKey = 0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890;
+        address newSigner = vm.addr(newSignerPrivateKey);
+        
+        vm.prank(admin);
+        tollanUniverseItems.setSigner(newSigner);
+
+        // Try to claim with old signature
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(IErrors.InvalidSigner.selector));
+        tollanUniverseItems.claim(
+            tokenId,
+            PHYSICAL_ID_1,
+            amount,
+            deadline,
+            signature
+        );
+    }
+
+    function test_Claim_SuccessAfterSignerChange_WithNewSignature() public {
+        // Define item
+        vm.prank(admin);
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
+
+        uint256 tokenId = 1;
+        uint256 amount = 10;
+        uint256 deadline = block.timestamp + 1 hours;
+        uint256 nonce = tollanUniverseItems.nonces(user);
+
+        // Change signer
+        uint256 newSignerPrivateKey = 0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890;
+        address newSigner = vm.addr(newSignerPrivateKey);
+        
+        vm.prank(admin);
+        tollanUniverseItems.setSigner(newSigner);
+
+        // Sign with new signer
+        bytes memory signature = _signClaimWithKey(
+            user,
+            tokenId,
+            PHYSICAL_ID_1,
+            amount,
+            nonce,
+            deadline,
+            newSignerPrivateKey
+        );
+
+        // Claim should succeed with new signature
+        vm.prank(user);
+        tollanUniverseItems.claim(
+            tokenId,
+            PHYSICAL_ID_1,
+            amount,
+            deadline,
+            signature
+        );
+
+        assertEq(tollanUniverseItems.balanceOf(user, tokenId), amount);
+        assertEq(tollanUniverseItems.getClaimed(user, PHYSICAL_ID_1), amount);
     }
 
     // =============================================================
