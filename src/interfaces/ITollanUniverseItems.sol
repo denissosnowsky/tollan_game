@@ -94,6 +94,20 @@ interface ITollanUniverseItems is IErrors {
      */
     event SignerUpdated(address indexed oldSigner, address indexed newSigner);
 
+    /**
+     * @notice Emitted when the minter address is updated.
+     * @param oldMinter Previous minter address.
+     * @param newMinter New minter address.
+     */
+    event MinterUpdated(address indexed oldMinter, address indexed newMinter);
+
+    /**
+     * @notice Emitted when the burner address is updated.
+     * @param oldBurner Previous burner address.
+     * @param newBurner New burner address.
+     */
+    event BurnerUpdated(address indexed oldBurner, address indexed newBurner);
+
     // =============================================================
     // ITEM DEFINITION
     // =============================================================
@@ -253,6 +267,18 @@ interface ITollanUniverseItems is IErrors {
      * @param newSigner New signer address.
      */
     function setSigner(address newSigner) external;
+
+    /**
+     * @notice Updates the minter address.
+     * @param newMinter New minter address.
+     */
+    function setMinter(address newMinter) external;
+
+    /**
+     * @notice Updates the burner address.
+     * @param newBurner New burner address.
+     */
+    function setBurner(address newBurner) external;
 
     // =============================================================
     // PAUSE MANAGEMENT

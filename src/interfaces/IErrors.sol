@@ -50,6 +50,16 @@ interface IErrors {
     error InvalidSigner();
 
     /**
+     * @notice Error thrown when an invalid minter is provided.
+     */
+    error InvalidMinter();
+
+    /**
+     * @notice Error thrown when an invalid burner is provided.
+     */
+    error InvalidBurner();
+
+    /**
      * @notice Error thrown when a signature has expired.
      */
     error SignatureExpired();

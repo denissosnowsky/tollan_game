@@ -73,4 +73,16 @@ interface ITollanUniverseItemsView is IErrors {
      * @return signer Current signer address.
      */
     function getSigner() external view returns (address);
+
+    /**
+     * @notice Returns the current minter address.
+     * @return minter Current minter address.
+     */
+    function getMinter() external view returns (address);
+
+    /**
+     * @notice Returns the current burner address.
+     * @return burner Current burner address.
+     */
+    function getBurner() external view returns (address);
 }

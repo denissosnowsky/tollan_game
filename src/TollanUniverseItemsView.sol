@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {ERC2981Upgradeable} from "@openzeppelin/contracts-upgradeable/token/common/ERC2981Upgradeable.sol";
 import {ERC1155Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ERC1155URIStorageUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155URIStorageUpgradeable.sol";
 import {ERC1155SupplyUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol";
 import {ERC1155PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155PausableUpgradeable.sol";
@@ -19,14 +18,12 @@ contract TollanUniverseItemsView is
     ERC1155SupplyUpgradeable,
     ERC1155PausableUpgradeable,
     ERC1155BurnableUpgradeable,
-    AccessControlUpgradeable,
     ITollanUniverseItemsView,
     TollanUniverseItemsStorage
 {
     function __TollanUniverseItemsView_init() internal onlyInitializing {
         __ERC1155_init("");
         __ERC1155URIStorage_init();
-        __AccessControl_init();
         __ERC1155Supply_init();
         __ERC1155Pausable_init();
         __ERC1155Burnable_init();
@@ -114,6 +111,22 @@ contract TollanUniverseItemsView is
         return $.signer;
     }
 
+    /**
+     * @inheritdoc ITollanUniverseItemsView
+     */
+    function getMinter() external view returns (address) {
+        TollanItemsStorage storage $ = _getTollanItemsStorage();
+        return $.minter;
+    }
+
+    /**
+     * @inheritdoc ITollanUniverseItemsView
+     */
+    function getBurner() external view returns (address) {
+        TollanItemsStorage storage $ = _getTollanItemsStorage();
+        return $.burner;
+    }
+
     function uri(
         uint256 tokenId
     )
@@ -131,11 +144,7 @@ contract TollanUniverseItemsView is
     )
         public
         view
-        override(
-            ERC1155Upgradeable,
-            AccessControlUpgradeable,
-            ERC2981Upgradeable
-        )
+        override(ERC1155Upgradeable, ERC2981Upgradeable)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);

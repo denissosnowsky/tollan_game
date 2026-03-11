@@ -5,6 +5,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 
 import {TollanUniverseItemsView} from "./TollanUniverseItemsView.sol";
 import {ITollanUniverseItems} from "./interfaces/ITollanUniverseItems.sol";
@@ -19,7 +20,7 @@ import {ITollanUniverseItems} from "./interfaces/ITollanUniverseItems.sol";
  * - ERC1155SupplyUpgradeable
  * - ERC1155PausableUpgradeable
  * - ERC1155BurnableUpgradeable
- * - AccessControlUpgradeable
+ * - Ownable2StepUpgradeable
  * - ERC2981Upgradeable
  * - EIP712Upgradeable
  *
@@ -37,7 +38,8 @@ contract TollanUniverseItems is
     EIP712Upgradeable,
     NoncesUpgradeable,
     ITollanUniverseItems,
-    TollanUniverseItemsView
+    TollanUniverseItemsView,
+    Ownable2StepUpgradeable
 {
     using ECDSA for bytes32;
 
@@ -73,6 +75,22 @@ contract TollanUniverseItems is
         _;
     }
 
+    /**
+     * @notice Checks if the user is minter.
+     */
+    modifier onlyMinter(address user) {
+        _onlyMinter(user);
+        _;
+    }
+
+    /**
+     * @notice Checks if the user is burner.
+     */
+    modifier onlyBurner(address user) {
+        _onlyBurner(user);
+        _;
+    }
+
     constructor() {
         _disableInitializers();
     }
@@ -102,13 +120,15 @@ contract TollanUniverseItems is
         __TollanUniverseItemsView_init();
         __Nonces_init();
         __EIP712_init(name712, version712);
-
-        _grantRoles(admin, minter, burner);
+        __Ownable2Step_init();
+        __Ownable_init(admin);
 
         TollanItemsStorage storage $ = _getTollanItemsStorage();
         // Start from 1, reserve 0 as "undefined"
         $.nextTokenId = 1;
         $.signer = signer;
+        $.minter = minter;
+        $.burner = burner;
     }
 
     // =============================================================
@@ -122,12 +142,7 @@ contract TollanUniverseItems is
         string calldata physicalId,
         string calldata metadataURI,
         uint256 amountCap
-    )
-        public
-        onlyRole(ADMIN_ROLE)
-        notEmptyString(physicalId)
-        returns (uint256 nftId)
-    {
+    ) public onlyOwner notEmptyString(physicalId) returns (uint256 nftId) {
         return _defineItem(physicalId, metadataURI, amountCap);
     }
 
@@ -138,7 +153,7 @@ contract TollanUniverseItems is
         string[] calldata physicalIds,
         string[] calldata metadataUrIs,
         uint256[] calldata amountCaps
-    ) public onlyRole(ADMIN_ROLE) returns (uint256[] memory nftIds) {
+    ) public onlyOwner returns (uint256[] memory nftIds) {
         uint256 length = physicalIds.length;
 
         if (length != metadataUrIs.length || length != amountCaps.length)
@@ -167,7 +182,7 @@ contract TollanUniverseItems is
     function setTokenURI(
         uint256 tokenId,
         string calldata newURI
-    ) external override onlyRole(ADMIN_ROLE) notZeroUint(tokenId) {
+    ) external override onlyOwner notZeroUint(tokenId) {
         _isItemDefinedTokenId(tokenId);
         _setURI(tokenId, newURI);
         emit TokenURIUpdated(tokenId, newURI);
@@ -178,7 +193,7 @@ contract TollanUniverseItems is
      */
     function setBaseURI(
         string calldata newBaseURI
-    ) external override onlyRole(ADMIN_ROLE) {
+    ) external override onlyOwner {
         _setBaseURI(newBaseURI);
         emit BaseURIUpdated(newBaseURI);
     }
@@ -186,14 +201,14 @@ contract TollanUniverseItems is
     /**
      * @inheritdoc ITollanUniverseItems
      */
-    function pause() external override onlyRole(ADMIN_ROLE) {
+    function pause() external override onlyOwner {
         _pause();
     }
 
     /**
      * @inheritdoc ITollanUniverseItems
      */
-    function unpause() external override onlyRole(ADMIN_ROLE) {
+    function unpause() external override onlyOwner {
         _unpause();
     }
 
@@ -204,7 +219,7 @@ contract TollanUniverseItems is
         uint256 tokenId,
         address receiver,
         uint96 feeNumerator
-    ) external onlyRole(ADMIN_ROLE) {
+    ) external onlyOwner {
         _setTokenRoyalty(tokenId, receiver, feeNumerator);
     }
 
@@ -214,7 +229,7 @@ contract TollanUniverseItems is
     function setDefaultRoyalty(
         address receiver,
         uint96 feeNumerator
-    ) external onlyRole(ADMIN_ROLE) {
+    ) external onlyOwner {
         _setDefaultRoyalty(receiver, feeNumerator);
     }
 
@@ -223,11 +238,35 @@ contract TollanUniverseItems is
      */
     function setSigner(
         address newSigner
-    ) external onlyRole(ADMIN_ROLE) notZeroAddress(newSigner) {
+    ) external onlyOwner notZeroAddress(newSigner) {
         TollanItemsStorage storage $ = _getTollanItemsStorage();
         address oldSigner = $.signer;
         $.signer = newSigner;
         emit SignerUpdated(oldSigner, newSigner);
+    }
+
+    /**
+     * @inheritdoc ITollanUniverseItems
+     */
+    function setMinter(
+        address newMinter
+    ) external onlyOwner notZeroAddress(newMinter) {
+        TollanItemsStorage storage $ = _getTollanItemsStorage();
+        address oldMinter = $.minter;
+        $.minter = newMinter;
+        emit MinterUpdated(oldMinter, newMinter);
+    }
+
+    /**
+     * @inheritdoc ITollanUniverseItems
+     */
+    function setBurner(
+        address newBurner
+    ) external onlyOwner notZeroAddress(newBurner) {
+        TollanItemsStorage storage $ = _getTollanItemsStorage();
+        address oldBurner = $.burner;
+        $.burner = newBurner;
+        emit BurnerUpdated(oldBurner, newBurner);
     }
 
     // =============================================================
@@ -243,7 +282,7 @@ contract TollanUniverseItems is
         uint256 amount
     )
         external
-        onlyRole(MINT_ROLE)
+        onlyMinter(_msgSender())
         notZeroAddress(to)
         notZeroUint(amount)
         notEmptyString(physicalId)
@@ -264,7 +303,7 @@ contract TollanUniverseItems is
         address to,
         string[] calldata physicalIds,
         uint256[] calldata amounts
-    ) external onlyRole(MINT_ROLE) notZeroAddress(to) whenNotPaused {
+    ) external onlyMinter(_msgSender()) notZeroAddress(to) whenNotPaused {
         if (physicalIds.length != amounts.length) revert LengthMismatch();
 
         TollanItemsStorage storage $ = _getTollanItemsStorage();
@@ -292,7 +331,7 @@ contract TollanUniverseItems is
         uint256 amount
     )
         external
-        onlyRole(BURN_ROLE)
+        onlyBurner(_msgSender())
         notZeroAddress(from)
         notZeroUint(amount)
         notEmptyString(physicalId)
@@ -313,7 +352,7 @@ contract TollanUniverseItems is
         address from,
         string[] calldata physicalIds,
         uint256[] calldata amounts
-    ) external onlyRole(BURN_ROLE) notZeroAddress(from) whenNotPaused {
+    ) external onlyBurner(_msgSender()) notZeroAddress(from) whenNotPaused {
         if (physicalIds.length != amounts.length) revert LengthMismatch();
 
         TollanItemsStorage storage $ = _getTollanItemsStorage();
@@ -467,15 +506,16 @@ contract TollanUniverseItems is
             revert SignatureExpired();
     }
 
-    function _grantRoles(
-        address admin,
-        address minter,
-        address burner
-    ) internal {
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(ADMIN_ROLE, admin);
-        _grantRole(MINT_ROLE, minter);
-        _grantRole(BURN_ROLE, burner);
+    function _onlyMinter(address user) internal view {
+        if (user != _getTollanItemsStorage().minter) {
+            revert InvalidMinter();
+        }
+    }
+
+    function _onlyBurner(address user) internal view {
+        if (user != _getTollanItemsStorage().burner) {
+            revert InvalidBurner();
+        }
     }
 
     function _validateSignature(

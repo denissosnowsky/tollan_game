@@ -10,12 +10,12 @@ contract DefineItemScript is Script {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         address contractAddress = vm.envOr(
             "CONTRACT_ADDRESS",
-            0x229Cba7Bc864d202F9249AC8bcB666C27B3db605
+            0xE3353dA20D2E43e789ab92708D956a4a4d65Bf7D
         );
 
         // item data
         string memory physicalId = "CNY_LEGENDARY_CHARACTER";
-        string memory metadataURI = "/";
+        string memory metadataURI = "2.json";
         uint256 amountCap = 0;
 
         console.log("Defining item on contract:", contractAddress);

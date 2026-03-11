@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC1155Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
@@ -37,14 +37,6 @@ contract TollanUniverseItemsTest is Test {
     uint256 constant AMOUNT_CAP_UNLIMITED = 0;
     uint256 constant AMOUNT_CAP_100 = 100;
 
-    // Role constants
-    bytes32 constant ADMIN_ROLE =
-        0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775;
-    bytes32 constant MINT_ROLE =
-        0x154c00819833dac601ee5ddded6fda79d9d8b506b911b3dbd54cdb95fe6c3686;
-    bytes32 constant BURN_ROLE =
-        0xe97b137254058bd94f28d2f3eb79e2d34074ffb488d042e3bc958e0a57d2fa22;
-
     // EIP-712 typehashes
     bytes32 constant CLAIM_TYPEHASH =
         0xea97b92824caa45e673dad22b48157385b7963088a25cd77eda4e99f0b4450a2;
@@ -65,6 +57,8 @@ contract TollanUniverseItemsTest is Test {
     );
     event ItemClaimed(address indexed user, uint256 tokenId, uint256 amount);
     event SignerUpdated(address indexed oldSigner, address indexed newSigner);
+    event MinterUpdated(address indexed oldMinter, address indexed newMinter);
+    event BurnerUpdated(address indexed oldBurner, address indexed newBurner);
 
     function setUp() public {
         signer = vm.addr(signerPrivateKey);
@@ -92,15 +86,14 @@ contract TollanUniverseItemsTest is Test {
     // =============================================================
 
     function test_Initialize_SetsRolesCorrectly() public view {
-        assertTrue(
-            tollanUniverseItems.hasRole(
-                tollanUniverseItems.DEFAULT_ADMIN_ROLE(),
-                admin
-            )
-        );
-        assertTrue(tollanUniverseItems.hasRole(ADMIN_ROLE, admin));
-        assertTrue(tollanUniverseItems.hasRole(MINT_ROLE, minter));
-        assertTrue(tollanUniverseItems.hasRole(BURN_ROLE, burner));
+        // Check owner is set correctly (Ownable2StepUpgradeable)
+        assertEq(tollanUniverseItems.owner(), admin);
+        // Check minter is set correctly
+        assertEq(tollanUniverseItems.getMinter(), minter);
+        // Check burner is set correctly
+        assertEq(tollanUniverseItems.getBurner(), burner);
+        // Check signer is set correctly
+        assertEq(tollanUniverseItems.getSigner(), signer);
     }
 
     function test_Initialize_SetsNextTokenIdTo1() public view {
@@ -153,9 +146,8 @@ contract TollanUniverseItemsTest is Test {
         vm.prank(user);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                ADMIN_ROLE
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
             )
         );
         tollanUniverseItems.defineItem(
@@ -296,9 +288,8 @@ contract TollanUniverseItemsTest is Test {
         vm.prank(user);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                ADMIN_ROLE
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
             )
         );
         tollanUniverseItems.defineItems(physicalIds, metadataURIs, amountCaps);
@@ -355,9 +346,8 @@ contract TollanUniverseItemsTest is Test {
         vm.prank(user);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                ADMIN_ROLE
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
             )
         );
         tollanUniverseItems.setTokenURI(1, METADATA_URI_2);
@@ -400,9 +390,8 @@ contract TollanUniverseItemsTest is Test {
         vm.prank(user);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                ADMIN_ROLE
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
             )
         );
         tollanUniverseItems.setBaseURI("https://example.com/");
@@ -423,9 +412,8 @@ contract TollanUniverseItemsTest is Test {
         vm.prank(user);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                ADMIN_ROLE
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
             )
         );
         tollanUniverseItems.pause();
@@ -448,9 +436,8 @@ contract TollanUniverseItemsTest is Test {
         vm.prank(user);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                ADMIN_ROLE
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
             )
         );
         tollanUniverseItems.unpause();
@@ -498,9 +485,8 @@ contract TollanUniverseItemsTest is Test {
         vm.prank(user);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                ADMIN_ROLE
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
             )
         );
         tollanUniverseItems.setTokenRoyalty(1, admin, 500);
@@ -531,12 +517,204 @@ contract TollanUniverseItemsTest is Test {
         vm.prank(user);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                ADMIN_ROLE
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
             )
         );
         tollanUniverseItems.setDefaultRoyalty(admin, 250);
+    }
+
+    // =============================================================
+    // OWNERSHIP TRANSFER TESTS (Ownable2StepUpgradeable)
+    // =============================================================
+
+    function test_Owner_ReturnsInitialOwner() public view {
+        assertEq(tollanUniverseItems.owner(), admin);
+    }
+
+    function test_PendingOwner_ReturnsZeroAddressInitially() public view {
+        assertEq(tollanUniverseItems.pendingOwner(), address(0));
+    }
+
+    function test_TransferOwnership_SetsPendingOwner() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.prank(admin);
+        tollanUniverseItems.transferOwnership(newOwner);
+
+        assertEq(tollanUniverseItems.pendingOwner(), newOwner);
+        // Owner should still be admin until accepted
+        assertEq(tollanUniverseItems.owner(), admin);
+    }
+
+    function test_TransferOwnership_RevertsIfNotOwner() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
+            )
+        );
+        tollanUniverseItems.transferOwnership(newOwner);
+    }
+
+    function test_AcceptOwnership_Success() public {
+        address newOwner = makeAddr("newOwner");
+
+        // Step 1: Current owner initiates transfer
+        vm.prank(admin);
+        tollanUniverseItems.transferOwnership(newOwner);
+
+        // Step 2: New owner accepts ownership
+        vm.prank(newOwner);
+        tollanUniverseItems.acceptOwnership();
+
+        assertEq(tollanUniverseItems.owner(), newOwner);
+        assertEq(tollanUniverseItems.pendingOwner(), address(0));
+    }
+
+    function test_AcceptOwnership_RevertsIfNotPendingOwner() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.prank(admin);
+        tollanUniverseItems.transferOwnership(newOwner);
+
+        // User tries to accept (not the pending owner)
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
+            )
+        );
+        tollanUniverseItems.acceptOwnership();
+    }
+
+    function test_AcceptOwnership_RevertsIfNoPendingOwner() public {
+        // No transfer was initiated, so no pending owner
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
+            )
+        );
+        tollanUniverseItems.acceptOwnership();
+    }
+
+    function test_TransferOwnership_CanBeOverwritten() public {
+        address newOwner1 = makeAddr("newOwner1");
+        address newOwner2 = makeAddr("newOwner2");
+
+        // Initiate transfer to newOwner1
+        vm.prank(admin);
+        tollanUniverseItems.transferOwnership(newOwner1);
+        assertEq(tollanUniverseItems.pendingOwner(), newOwner1);
+
+        // Overwrite with newOwner2
+        vm.prank(admin);
+        tollanUniverseItems.transferOwnership(newOwner2);
+        assertEq(tollanUniverseItems.pendingOwner(), newOwner2);
+
+        // newOwner1 cannot accept anymore
+        vm.prank(newOwner1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                newOwner1
+            )
+        );
+        tollanUniverseItems.acceptOwnership();
+
+        // newOwner2 can accept
+        vm.prank(newOwner2);
+        tollanUniverseItems.acceptOwnership();
+        assertEq(tollanUniverseItems.owner(), newOwner2);
+    }
+
+    function test_NewOwner_CanPerformAdminFunctions() public {
+        address newOwner = makeAddr("newOwner");
+
+        // Transfer ownership
+        vm.prank(admin);
+        tollanUniverseItems.transferOwnership(newOwner);
+
+        vm.prank(newOwner);
+        tollanUniverseItems.acceptOwnership();
+
+        // New owner can perform admin functions
+        vm.prank(newOwner);
+        uint256 nftId = tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
+
+        assertEq(nftId, 1);
+    }
+
+    function test_OldOwner_CannotPerformAdminFunctionsAfterTransfer() public {
+        address newOwner = makeAddr("newOwner");
+
+        // Transfer ownership
+        vm.prank(admin);
+        tollanUniverseItems.transferOwnership(newOwner);
+
+        vm.prank(newOwner);
+        tollanUniverseItems.acceptOwnership();
+
+        // Old owner (admin) cannot perform admin functions anymore
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                admin
+            )
+        );
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
+    }
+
+    function test_RenounceOwnership_Success() public {
+        vm.prank(admin);
+        tollanUniverseItems.renounceOwnership();
+
+        assertEq(tollanUniverseItems.owner(), address(0));
+    }
+
+    function test_RenounceOwnership_RevertsIfNotOwner() public {
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
+            )
+        );
+        tollanUniverseItems.renounceOwnership();
+    }
+
+    function test_RenounceOwnership_NoOneCanPerformAdminFunctions() public {
+        vm.prank(admin);
+        tollanUniverseItems.renounceOwnership();
+
+        // No one can perform admin functions
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                admin
+            )
+        );
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
     }
 
     // =============================================================
@@ -565,9 +743,8 @@ contract TollanUniverseItemsTest is Test {
         vm.prank(user);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                ADMIN_ROLE
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
             )
         );
         tollanUniverseItems.setSigner(newSigner);
@@ -681,6 +858,192 @@ contract TollanUniverseItemsTest is Test {
     }
 
     // =============================================================
+    // MINTER MANAGEMENT TESTS
+    // =============================================================
+
+    function test_GetMinter_ReturnsInitialMinter() public view {
+        assertEq(tollanUniverseItems.getMinter(), minter);
+    }
+
+    function test_SetMinter_Success() public {
+        address newMinter = makeAddr("newMinter");
+
+        vm.expectEmit(true, true, false, false);
+        emit MinterUpdated(minter, newMinter);
+
+        vm.prank(admin);
+        tollanUniverseItems.setMinter(newMinter);
+
+        assertEq(tollanUniverseItems.getMinter(), newMinter);
+    }
+
+    function test_SetMinter_RevertsIfNotAdmin() public {
+        address newMinter = makeAddr("newMinter");
+
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
+            )
+        );
+        tollanUniverseItems.setMinter(newMinter);
+    }
+
+    function test_SetMinter_RevertsIfZeroAddress() public {
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(IErrors.ZeroAddress.selector, address(0))
+        );
+        tollanUniverseItems.setMinter(address(0));
+    }
+
+    function test_SetMinter_EmitsEvent() public {
+        address newMinter = makeAddr("newMinter");
+
+        vm.expectEmit(true, true, false, false);
+        emit MinterUpdated(minter, newMinter);
+
+        vm.prank(admin);
+        tollanUniverseItems.setMinter(newMinter);
+    }
+
+    function test_MintByPhysicalId_RevertsAfterMinterChange_WithOldMinter() public {
+        vm.prank(admin);
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
+
+        // Change minter
+        address newMinter = makeAddr("newMinter");
+        vm.prank(admin);
+        tollanUniverseItems.setMinter(newMinter);
+
+        // Try to mint with old minter
+        vm.prank(minter);
+        vm.expectRevert(IErrors.InvalidMinter.selector);
+        tollanUniverseItems.mintByPhysicalId(user, PHYSICAL_ID_1, 10);
+    }
+
+    function test_MintByPhysicalId_SuccessAfterMinterChange_WithNewMinter() public {
+        vm.prank(admin);
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
+
+        // Change minter
+        address newMinter = makeAddr("newMinter");
+        vm.prank(admin);
+        tollanUniverseItems.setMinter(newMinter);
+
+        // Mint with new minter should succeed
+        vm.prank(newMinter);
+        tollanUniverseItems.mintByPhysicalId(user, PHYSICAL_ID_1, 10);
+
+        assertEq(tollanUniverseItems.balanceOf(user, 1), 10);
+    }
+
+    // =============================================================
+    // BURNER MANAGEMENT TESTS
+    // =============================================================
+
+    function test_GetBurner_ReturnsInitialBurner() public view {
+        assertEq(tollanUniverseItems.getBurner(), burner);
+    }
+
+    function test_SetBurner_Success() public {
+        address newBurner = makeAddr("newBurner");
+
+        vm.expectEmit(true, true, false, false);
+        emit BurnerUpdated(burner, newBurner);
+
+        vm.prank(admin);
+        tollanUniverseItems.setBurner(newBurner);
+
+        assertEq(tollanUniverseItems.getBurner(), newBurner);
+    }
+
+    function test_SetBurner_RevertsIfNotAdmin() public {
+        address newBurner = makeAddr("newBurner");
+
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user
+            )
+        );
+        tollanUniverseItems.setBurner(newBurner);
+    }
+
+    function test_SetBurner_RevertsIfZeroAddress() public {
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(IErrors.ZeroAddress.selector, address(0))
+        );
+        tollanUniverseItems.setBurner(address(0));
+    }
+
+    function test_SetBurner_EmitsEvent() public {
+        address newBurner = makeAddr("newBurner");
+
+        vm.expectEmit(true, true, false, false);
+        emit BurnerUpdated(burner, newBurner);
+
+        vm.prank(admin);
+        tollanUniverseItems.setBurner(newBurner);
+    }
+
+    function test_BurnByPhysicalId_RevertsAfterBurnerChange_WithOldBurner() public {
+        vm.prank(admin);
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
+
+        vm.prank(minter);
+        tollanUniverseItems.mintByPhysicalId(user, PHYSICAL_ID_1, 10);
+
+        // Change burner
+        address newBurner = makeAddr("newBurner");
+        vm.prank(admin);
+        tollanUniverseItems.setBurner(newBurner);
+
+        // Try to burn with old burner
+        vm.prank(burner);
+        vm.expectRevert(IErrors.InvalidBurner.selector);
+        tollanUniverseItems.burnByPhysicalId(user, PHYSICAL_ID_1, 5);
+    }
+
+    function test_BurnByPhysicalId_SuccessAfterBurnerChange_WithNewBurner() public {
+        vm.prank(admin);
+        tollanUniverseItems.defineItem(
+            PHYSICAL_ID_1,
+            METADATA_URI_1,
+            AMOUNT_CAP_UNLIMITED
+        );
+
+        vm.prank(minter);
+        tollanUniverseItems.mintByPhysicalId(user, PHYSICAL_ID_1, 10);
+
+        // Change burner
+        address newBurner = makeAddr("newBurner");
+        vm.prank(admin);
+        tollanUniverseItems.setBurner(newBurner);
+
+        // Burn with new burner should succeed
+        vm.prank(newBurner);
+        tollanUniverseItems.burnByPhysicalId(user, PHYSICAL_ID_1, 5);
+
+        assertEq(tollanUniverseItems.balanceOf(user, 1), 5);
+    }
+
+    // =============================================================
     // MINT BY PHYSICAL ID TESTS
     // =============================================================
 
@@ -708,13 +1071,7 @@ contract TollanUniverseItemsTest is Test {
         );
 
         vm.prank(user);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                MINT_ROLE
-            )
-        );
+        vm.expectRevert(IErrors.InvalidMinter.selector);
         tollanUniverseItems.mintByPhysicalId(user, PHYSICAL_ID_1, 10);
     }
 
@@ -836,13 +1193,7 @@ contract TollanUniverseItemsTest is Test {
         amounts[0] = 10;
 
         vm.prank(user);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                MINT_ROLE
-            )
-        );
+        vm.expectRevert(IErrors.InvalidMinter.selector);
         tollanUniverseItems.mintBatchByPhysicalId(user, physicalIds, amounts);
     }
 
@@ -942,13 +1293,7 @@ contract TollanUniverseItemsTest is Test {
         tollanUniverseItems.mintByPhysicalId(user, PHYSICAL_ID_1, 10);
 
         vm.prank(user);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                BURN_ROLE
-            )
-        );
+        vm.expectRevert(IErrors.InvalidBurner.selector);
         tollanUniverseItems.burnByPhysicalId(user, PHYSICAL_ID_1, 5);
     }
 
@@ -1078,13 +1423,7 @@ contract TollanUniverseItemsTest is Test {
         amounts[0] = 5;
 
         vm.prank(user);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                user,
-                BURN_ROLE
-            )
-        );
+        vm.expectRevert(IErrors.InvalidBurner.selector);
         tollanUniverseItems.burnBatchByPhysicalId(user, physicalIds, amounts);
     }
 
@@ -1925,12 +2264,6 @@ contract TollanUniverseItemsTest is Test {
         );
         // ERC165
         assertTrue(tollanUniverseItems.supportsInterface(0x01ffc9a7));
-        // AccessControl
-        assertTrue(
-            tollanUniverseItems.supportsInterface(
-                type(IAccessControl).interfaceId
-            )
-        );
     }
 
     // =============================================================
